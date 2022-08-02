@@ -1,0 +1,111 @@
+#include <unistd.h>
+#include "util.h"
+#include "stdlib.h"
+#include "stdio.h"
+#include <limits.h>
+#include <dirent.h>
+
+
+extern int system_call();
+typedef struct ent{
+    int inode;
+    int offset;
+    short len;
+    char buf[1];
+} ent;
+#define SYS_WRITE 4
+#define STDOUT 1
+#define STDIN 0
+#define SEEK 19
+#define CLOSE 6
+#define OPEN 5
+#define READ 3
+#define STDERR 2
+#define GETDENTS 141
+
+void filesList(const char* dirname);
+void filesListPre(const char* dirname, char * prefix);
+
+
+int main (int argc , char* argv[], char* envp[]){
+    system_call(SYS_WRITE,STDOUT,"Flame 2 strikes! \n", 18);
+    int pflag = 0;
+    char* prefix;
+    int i;
+    for(i = 1; i < argc; i = i + 1){
+        if(argv[i][1] == 'p' && argv[i][0] == '-'){
+            pflag = 1;
+            prefix = argv[i] + 2;
+        }
+    }
+    if(pflag == 0){
+        filesList(".");
+    }
+    else{
+        filesListPre(".", prefix);
+    }
+
+    return 0;
+}
+
+void filesList(const char* dirname){
+    char buffer[8192];
+    ent* enta = buffer;
+    int dirfd = system_call(OPEN,".",0,0777);
+    int size;
+    size = system_call(GETDENTS,dirfd,enta,8192);
+    int i = 0;
+    while(i < size){
+        system_call(SYS_WRITE,STDOUT,(enta)->buf, strlen((enta->buf)));
+        system_call(SYS_WRITE,STDOUT,"\n", 1);
+        i = i + (enta)->len;
+        enta = i + buffer;
+    }
+
+}
+
+void filesListPre(const char* dirname, char * prefix){
+
+    char buffer[8192];
+    ent* enta = buffer;
+    int dirfd = system_call(OPEN,".",0,0777);
+    int size;
+    size = system_call(GETDENTS,dirfd,enta,8192);
+    int i = 0;
+    while(i < size){
+
+        if(strncmp((enta)->buf,prefix, strlen(prefix)) == 0){
+            system_call(SYS_WRITE,STDOUT,(enta)->buf, strlen((enta->buf)));
+            char* type = *(buffer + i + enta->len - 1);
+            char* ftype;
+            switch ((int)type) {
+                case 1:
+                    ftype = " FIFO";
+                    break;
+                case 2:
+                    ftype = " char dev\" : \" Unknown";
+                    break;
+                case 4:
+                    ftype = " directory";
+                    break;
+                case 6:
+                    ftype = " blcok dev";
+                    break;
+                case 8:
+                    ftype = " regular";
+                    break;
+                case 10:
+                    ftype = " symlink";
+                    break;
+                case 12:
+                    ftype = " socket";
+                    break;
+            }
+            system_call(SYS_WRITE,STDOUT,ftype, strlen(ftype));
+            system_call(SYS_WRITE,STDOUT,"\n", 1);
+        }
+        i = i + (enta)->len;
+        enta = i + buffer;
+    }
+
+}
